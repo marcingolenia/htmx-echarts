@@ -3,6 +3,7 @@ import { Layout } from "./templates/layout";
 import { serveStatic } from "hono/bun";
 import { NumberAdder } from "./templates/number-adder";
 import { streamSSE } from 'hono/streaming'
+import charts from "./charts";
 
 const app = new Hono();
 
@@ -43,6 +44,8 @@ app.get("/api/hello", (c) => {
   }
   return c.html(Layout({ children: <h1>Hello, world!</h1> }));
 });
+
+app.route("/charts", charts);
 
 export default {
   port: 3000,
