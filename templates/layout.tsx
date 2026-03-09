@@ -8,7 +8,7 @@ export default function Layout({ children }: { children?: unknown }) {
       <script src="/static/htmx.min.js.js" defer></script>
     </head>
     <body>
-     <h1>adddd</h1>
+     <h1>ada</h1>
      <img src="/static/unnamed.png" alt="Lytic" />
 
      <button hx-get="/api/hello" hx-swap="innerHTML" hx-target="#result" hx-push-url="true">
