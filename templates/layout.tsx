@@ -24,7 +24,7 @@ export const Layout = ({ children }: { children?: unknown }) => {
           Load grseseting
         </button>
         <button hx-get="/adder" hx-swap="innerHTML" hx-target="#adder">Add</button>
-        <button hx-get="/charts" hx-swap="innerHTML" hx-target="#charts">charts</button>
+        <button hx-get="/charts" hx-swap="innerHTML" hx-target="#charts" hx-push-url="true">charts</button>
         <div id="result">{children}</div>
         <div id="adder"></div>
         <div id="charts"></div>

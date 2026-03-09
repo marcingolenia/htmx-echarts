@@ -60,7 +60,14 @@ app.get("/update-chart", (c) => {
 app.get("/sse", (c) => {
   return streamSSE(c, async (stream) => {
     let id = 0;
-    while (true) {
+    let aborted = false;
+
+    stream.onAbort(() => {
+      aborted = true;
+      console.log("SSE client disconnected");
+    });
+
+    while (!aborted) {
       const point = {
         label: new Date().toLocaleTimeString(),
         value: Math.round(Math.random() * 100),
@@ -71,7 +78,7 @@ app.get("/sse", (c) => {
         event: "chart-update",
         data: JSON.stringify(point),
       });
-
+      console.log("sse", point);
       await stream.sleep(1000);
     }
   });
