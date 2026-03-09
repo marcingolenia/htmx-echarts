@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import layout from "./templates/layout";
 import { serveStatic } from "hono/bun";
-import { installDevReload } from "./dev-reload";
 
 const app = new Hono();
 
@@ -12,8 +11,6 @@ app.use(
     rewriteRequestPath: (p) => p.replace(/^\/static\/?/, ""),
   })
 );
-
-installDevReload(app);
 
 app.get("/", (c) => {
   return c.html(layout({ children: <h1>Hello, world!</h1> }));

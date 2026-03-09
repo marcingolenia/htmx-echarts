@@ -1,5 +1,3 @@
-import { DevReload } from "../dev-reload";
-
 export default function Layout({ children }: { children?: unknown }) {
   return (
     <html lang="en">
@@ -8,7 +6,6 @@ export default function Layout({ children }: { children?: unknown }) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Lytc</title>
         <script src="/static/htmx.min.js.js" defer></script>
-        <DevReload />
       </head>
       <body>
         <h1>tessa</h1>
