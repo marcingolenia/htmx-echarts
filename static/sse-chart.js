@@ -36,6 +36,10 @@
     );
 
     chart.setOption({
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: chartType === "bar" ? "shadow" : "line" },
+      },
       xAxis: { type: "category", data: xData },
       yAxis: { type: "value" },
       series: [
@@ -44,6 +48,13 @@
           data: yData,
           smooth: chartType === "line",
           areaStyle: chartType === "line" ? {} : undefined,
+          emphasis: {
+            focus: "series",
+            label: {
+              show: true,
+              position: chartType === "bar" ? "top" : "right",
+            },
+          },
         },
       ],
     });

@@ -44,6 +44,25 @@ export const Chart = ({ chart }: { chart: string }) => {
           style={{ width: 600, height: 400, border: "1px solid #eee" }}
         />
       </section>
+      {/* 3. Client-side ECharts chart bar that receives data over SSE */}
+      <section
+        id="sse-chart-section"
+        style={{ width: "100%", maxWidth: 640, marginBottom: 40 }}
+      >
+        <h2>SSE ECharts (client-side streaming)</h2>
+        <p>
+          This chart runs entirely in the browser. The server only streams new
+          data points over SSE, and the existing ECharts instance updates its
+          series without a full re-render.
+        </p>
+
+        <div
+          id="sse-chart-bar"
+          data-sse-chart="bar"
+          data-sse-url="/charts/sse"
+          style={{ width: 600, height: 400, border: "1px solid #eee" }}
+        />
+      </section>
     </div>
   );
 };
