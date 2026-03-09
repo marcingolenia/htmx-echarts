@@ -1,4 +1,4 @@
-export default function Layout({ children }: { children?: unknown }) {
+export const Layout = ({ children }: { children?: unknown }) => {
   return (
     <html lang="en">
       <head>
@@ -6,8 +6,9 @@ export default function Layout({ children }: { children?: unknown }) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Lytc</title>
         <script src="/static/htmx.min.js.js" defer></script>
+        <script src="/static/htmx-ext-sse.min.js" defer></script>
       </head>
-      <body>
+      <body hx-ext="sse">
         <h1>tessa</h1>
         <img src="/static/unnamed.png" alt="Lytic" />
 
@@ -19,7 +20,9 @@ export default function Layout({ children }: { children?: unknown }) {
         >
           Load grseseting
         </button>
+        <button hx-get="/adder" hx-swap="innerHTML" hx-target="#adder">Add</button>
         <div id="result">{children}</div>
+        <div id="adder"></div>
       </body>
     </html>
   );
