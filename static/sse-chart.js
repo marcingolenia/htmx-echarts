@@ -11,76 +11,69 @@
 //   2) Stream SSE events with JSON payloads: { "label": "...", "value": 123 }
 
 (function () {
-  if (typeof document === "undefined") return;
-
-  function waitForEcharts(callback) {
-    if (typeof window === "undefined") return;
-    if (window.echarts) {
-      callback();
-    } else {
-      setTimeout(function () {
-        waitForEcharts(callback);
-      }, 100);
-    }
-  }
-
   function initStreamingLineChart(el) {
     if (!el || el.dataset.sseChartInitialized === "true") return;
 
-    waitForEcharts(function () {
-      var existing = window.echarts.getInstanceByDom(el);
-      var chart = existing || window.echarts.init(el);
-
-      var xData = [];
-      var yData = [];
-
-      var chartType = el.getAttribute("data-sse-chart") || "line";
-
-      var maxPoints = parseInt(
-        el.getAttribute("data-sse-max-points") || "50",
-        10,
+    if (typeof window === "undefined" || !window.echarts) {
+      console.error(
+        "ECharts is not available on window.echarts. " +
+          "Make sure echarts.min.js is loaded before sse-chart.js.",
       );
+      return;
+    }
 
-      chart.setOption({
-        xAxis: { type: "category", data: xData },
-        yAxis: { type: "value" },
-        series: [
-          {
-            type: chartType,
-            data: yData,
-            smooth: chartType === "line",
-            areaStyle: chartType === "line" ? {} : undefined,
-          },
-        ],
-      });
+    var existing = window.echarts.getInstanceByDom(el);
+    var chart = existing || window.echarts.init(el);
 
-      var url = el.getAttribute("data-sse-url") || "/charts/sse";
-      var eventName = el.getAttribute("data-sse-event") || "chart-update";
+    var xData = [];
+    var yData = [];
 
-      var source = new EventSource(url);
+    var chartType = el.getAttribute("data-sse-chart") || "line";
 
-      source.addEventListener(eventName, function (ev) {
-        try {
-          var point = JSON.parse(ev.data);
-          xData.push(point.label);
-          yData.push(point.value);
+    var maxPoints = parseInt(
+      el.getAttribute("data-sse-max-points") || "50",
+      10,
+    );
 
-          if (xData.length > maxPoints) {
-            xData.shift();
-            yData.shift();
-          }
-
-          chart.setOption({
-            xAxis: { data: xData },
-            series: [{ data: yData }],
-          });
-        } catch (e) {
-          console.error("Invalid SSE chart payload", e);
-        }
-      });
-
-      el.dataset.sseChartInitialized = "true";
+    chart.setOption({
+      xAxis: { type: "category", data: xData },
+      yAxis: { type: "value" },
+      series: [
+        {
+          type: chartType,
+          data: yData,
+          smooth: chartType === "line",
+          areaStyle: chartType === "line" ? {} : undefined,
+        },
+      ],
     });
+
+    var url = el.getAttribute("data-sse-url") || "/charts/sse";
+    var eventName = el.getAttribute("data-sse-event") || "chart-update";
+
+    var source = new EventSource(url);
+
+    source.addEventListener(eventName, function (ev) {
+      try {
+        var point = JSON.parse(ev.data);
+        xData.push(point.label);
+        yData.push(point.value);
+
+        if (xData.length > maxPoints) {
+          xData.shift();
+          yData.shift();
+        }
+
+        chart.setOption({
+          xAxis: { data: xData },
+          series: [{ data: yData }],
+        });
+      } catch (e) {
+        console.error("Invalid SSE chart payload", e);
+      }
+    });
+
+    el.dataset.sseChartInitialized = "true";
   }
 
   function scanAndInit(root) {
@@ -89,15 +82,6 @@
     for (var i = 0; i < els.length; i++) {
       initStreamingLineChart(els[i]);
     }
-  }
-
-  // Run on initial page load
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () {
-      scanAndInit(document);
-    });
-  } else {
-    scanAndInit(document);
   }
 
   // Re-run after HTMX swaps, so charts loaded via hx-get / hx-swap are initialized
