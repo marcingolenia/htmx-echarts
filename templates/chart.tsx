@@ -39,6 +39,7 @@ export const Chart = ({ chart }: { chart: string }) => {
 
         <div
           id="sse-chart"
+          data-sse-chart="line"
           data-sse-url="/charts/sse"
           style={{ width: 600, height: 400, border: "1px solid #eee" }}
         />

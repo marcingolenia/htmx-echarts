@@ -1,48 +1,70 @@
-// Initializes the SSE-powered ECharts line chart on the element with id="sse-chart".
-// The server only streams data; the chart instance lives entirely in the browser.
+// Simple helper for SSE-driven ECharts line charts in the browser.
+// Usage pattern:
+//   1) Add a container:
+//        <div
+//          id="my-streaming-chart"
+//          data-sse-chart="line"
+//          data-sse-url="/charts/sse"
+//          data-sse-event="chart-update"      (optional, default: "chart-update")
+//          data-sse-max-points="50"           (optional, default: 50)
+//        ></div>
+//   2) Stream SSE events with JSON payloads: { "label": "...", "value": 123 }
 
 (function () {
-  function initSseChartOnElement(el) {
+  if (typeof document === "undefined") return;
+
+  function waitForEcharts(callback) {
+    if (typeof window === "undefined") return;
+    if (window.echarts) {
+      callback();
+    } else {
+      setTimeout(function () {
+        waitForEcharts(callback);
+      }, 100);
+    }
+  }
+
+  function initStreamingLineChart(el) {
     if (!el || el.dataset.sseChartInitialized === "true") return;
 
-    function ensureEchartsAndInit() {
-      if (typeof window === "undefined") return;
-
-      if (typeof window.echarts === "undefined") {
-        // Wait for the ECharts browser bundle to load
-        setTimeout(ensureEchartsAndInit, 100);
-        return;
-      }
-
+    waitForEcharts(function () {
       var existing = window.echarts.getInstanceByDom(el);
       var chart = existing || window.echarts.init(el);
 
       var xData = [];
       var yData = [];
 
+      var chartType = el.getAttribute("data-sse-chart") || "line";
+
+      var maxPoints = parseInt(
+        el.getAttribute("data-sse-max-points") || "50",
+        10,
+      );
+
       chart.setOption({
         xAxis: { type: "category", data: xData },
         yAxis: { type: "value" },
         series: [
           {
-            type: "line",
+            type: chartType,
             data: yData,
-            smooth: true,
-            areaStyle: {},
+            smooth: chartType === "line",
+            areaStyle: chartType === "line" ? {} : undefined,
           },
         ],
       });
 
       var url = el.getAttribute("data-sse-url") || "/charts/sse";
+      var eventName = el.getAttribute("data-sse-event") || "chart-update";
+
       var source = new EventSource(url);
 
-      source.addEventListener("chart-update", function (ev) {
+      source.addEventListener(eventName, function (ev) {
         try {
           var point = JSON.parse(ev.data);
           xData.push(point.label);
           yData.push(point.value);
 
-          var maxPoints = 50;
           if (xData.length > maxPoints) {
             xData.shift();
             yData.shift();
@@ -53,21 +75,19 @@
             series: [{ data: yData }],
           });
         } catch (e) {
-          console.error("Invalid chart-update payload", e);
+          console.error("Invalid SSE chart payload", e);
         }
       });
 
       el.dataset.sseChartInitialized = "true";
-    }
-
-    ensureEchartsAndInit();
+    });
   }
 
   function scanAndInit(root) {
     var scope = root || document;
-    var el = scope.querySelector("#sse-chart");
-    if (el) {
-      initSseChartOnElement(el);
+    var els = scope.querySelectorAll("[data-sse-chart]");
+    for (var i = 0; i < els.length; i++) {
+      initStreamingLineChart(els[i]);
     }
   }
 
