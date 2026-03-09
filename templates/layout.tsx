@@ -2,12 +2,14 @@ export const Layout = ({ children }: { children?: unknown }) => {
   return (
     <html lang="en">
       <head>
-        <meta charset="UTF-8" />
+        <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Lytc</title>
         <script src="/static/htmx.min.js.js" defer></script>
         <script src="/static/htmx-ext-sse.min.js" defer></script>
-        <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts-ssr.min.js" defer></script>
+        {/* Browser ECharts bundle so window.echarts is available */}
+        <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js" defer></script>
+        <script src="/static/sse-chart.js" defer></script>
       </head>
       <body hx-ext="sse">
         <h1>tessa</h1>
