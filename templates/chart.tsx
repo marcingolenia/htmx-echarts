@@ -63,6 +63,42 @@ export const Chart = ({ chart }: { chart: string }) => {
           style={{ width: 600, height: 400, border: "1px solid #eee" }}
         />
       </section>
+      <section
+        id="sse-chart-section"
+        style={{ width: "100%", maxWidth: 640, marginBottom: 40 }}
+      >
+        <h2>SSE ECharts (client-side streaming)</h2>
+        <p>
+          This chart runs entirely in the browser. The server only streams new
+          data points over SSE, and the existing ECharts instance updates its
+          series without a full re-render.
+        </p>
+
+        <div
+          data-chart-type="scatter"
+          data-url="/charts/sse-multi"
+          data-sse-event="chart-update"
+          style={{ width: "100%", height: 400, border: "1px solid #eee" }}
+        />
+      </section>
+      <section
+        id="sse-chart-section-3"
+        style={{ width: "100%", maxWidth: 640, marginBottom: 40 }}
+      >
+        <h2>SSE ECharts (client-side streaming)</h2>
+        <p>
+          This chart runs entirely in the browser. The server only streams new
+          data points over SSE, and the existing ECharts instance updates its
+          series without a full re-render.
+        </p>
+
+        <div
+          data-chart-type="line"
+          data-url="/charts/sse-latest"
+          data-sse-event="chart-update"
+          style={{ width: "100%", height: 400, border: "1px solid #eee" }}
+        />
+      </section>  
     </div>
   );
 };

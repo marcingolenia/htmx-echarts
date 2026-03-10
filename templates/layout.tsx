@@ -6,12 +6,11 @@ export const Layout = ({ children }: { children?: unknown }) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Lytc</title>
         <script src="/static/htmx.min.js.js" defer></script>
-        <script src="/static/htmx-ext-sse.min.js" defer></script>
         {/* Browser ECharts bundle so window.echarts is available */}
         <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js" defer></script>
-        <script src="/static/htmx-echarts-sse.js" defer></script>
+        <script src="/static/htmx-echarts.js" defer></script>
       </head>
-      <body hx-ext="sse echarts-sse">
+      <body hx-ext="echarts">
         <h1>tessa</h1>
         <img src="/static/unnamed.png" alt="Lytic" />
 

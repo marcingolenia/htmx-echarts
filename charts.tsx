@@ -3,6 +3,7 @@ import * as echarts from "echarts";
 import { streamSSE } from "hono/streaming";
 import { Chart } from "./templates/chart";
 import { Layout } from "./templates/layout";
+import { type EChartsOption } from "echarts";
 
 const app = new Hono();
 
@@ -61,11 +62,14 @@ app.get("/update-chart", (c) => {
   );
 });
 
-// SSE endpoint for streaming incremental data points to a client-side ECharts chart
+// SSE endpoint for streaming a single-series ECharts option
 app.get("/sse", (c) => {
   return streamSSE(c, async (stream) => {
     let id = 0;
     let aborted = false;
+    const labels: string[] = [];
+    const values: number[] = [];
+    const maxPoints = 50;
 
     stream.onAbort(() => {
       aborted = true;
@@ -73,17 +77,134 @@ app.get("/sse", (c) => {
     });
 
     while (!aborted) {
-      const point = {
-        label: new Date().toLocaleTimeString(),
-        value: Math.round(Math.random() * 100),
+      const label = new Date().toLocaleTimeString();
+      const value = Math.round(Math.random() * 100);
+
+      labels.push(label);
+      values.push(value);
+      if (labels.length > maxPoints) {
+        labels.shift();
+        values.shift();
+      }
+
+      const option: EChartsOption = {
+        tooltip: { trigger: "axis" },
+        xAxis: { type: "category", data: labels },
+        yAxis: { type: "value" },
+        series: [
+          {
+            name: "Random",
+            type: "line",
+            data: values,
+          },
+        ],
       };
 
       await stream.writeSSE({
         id: String(id++),
         event: "chart-update",
-        data: JSON.stringify(point),
+        data: JSON.stringify(option),
       });
-      console.log("sse", point);
+      console.log("sse", option);
+      await stream.sleep(1000);
+    }
+  });
+});
+
+// SSE endpoint for streaming a multi-series ECharts option
+app.get("/sse-multi", (c) => {
+  return streamSSE(c, async (stream) => {
+    let id = 0;
+    let aborted = false;
+    const labels: string[] = [];
+    const seriesA: number[] = [];
+    const seriesB: number[] = [];
+    const seriesC: number[] = [];
+    const maxPoints = 50;
+
+    stream.onAbort(() => {
+      aborted = true;
+      console.log("SSE multi-series client disconnected");
+    });
+
+    while (!aborted) {
+      const label = new Date().toLocaleTimeString();
+
+      labels.push(label);
+      seriesA.push(Math.round(Math.random() * 100));
+      seriesB.push(Math.round(Math.random() * 100));
+      seriesC.push(Math.round(Math.random() * 100));
+
+      if (labels.length > maxPoints) {
+        labels.shift();
+        seriesA.shift();
+        seriesB.shift();
+        seriesC.shift();
+      }
+
+      const option: EChartsOption = {
+        tooltip: { trigger: "axis" },
+        legend: { data: ["Series A", "Series B", "Series C"] },
+        xAxis: { type: "category", data: labels },
+        yAxis: { type: "value" },
+        series: [
+          { name: "Series A", type: "line", data: seriesA },
+          { name: "Series B", type: "line", data: seriesB },
+          { name: "Series C", type: "line", data: seriesC },
+        ],
+      };
+
+      await stream.writeSSE({
+        id: String(id++),
+        event: "chart-update",
+        data: JSON.stringify(option),
+      });
+      console.log("sse-multi", option);
+      await stream.sleep(500);
+    }
+  });
+});
+
+// SSE endpoint: every second send full option built from "latest 50 points".
+// Simulates a backend that filters in SQL (e.g. ORDER BY ts DESC LIMIT 50) and
+// returns that window — no shifting; we just append and send slice(-50).
+const LATEST_WINDOW = 10;
+
+app.get("/sse-latest", (c) => {
+  return streamSSE(c, async (stream) => {
+    let id = 0;
+    let aborted = false;
+    const labels: string[] = [];
+    const values: number[] = [];
+
+    stream.onAbort(() => {
+      aborted = true;
+      console.log("SSE latest client disconnected");
+    });
+
+    while (!aborted) {
+      labels.push(new Date().toLocaleTimeString());
+      values.push(Math.round(Math.random() * 100));
+
+      // "Query": latest N points (in production this would be your SQL result)
+      const latestLabels = labels.slice(-LATEST_WINDOW);
+      const latestValues = values.slice(-LATEST_WINDOW);
+
+      const option: EChartsOption = {
+        tooltip: { trigger: "axis" },
+        xAxis: { type: "category", data: latestLabels },
+        yAxis: { type: "value" },
+        series: [
+          { name: "Random", type: "line", data: latestValues },
+        ],
+      };
+
+      await stream.writeSSE({
+        id: String(id++),
+        event: "chart-update",
+        data: JSON.stringify(option),
+      });
+      console.log("sse-latest", latestLabels.length, "points");
       await stream.sleep(1000);
     }
   });
