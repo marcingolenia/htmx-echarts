@@ -9,95 +9,60 @@
 //          data-sse-max-points="50"           (optional, default: 50)
 //        ></div>
 //   2) Stream SSE events with JSON payloads: { "label": "...", "value": 123 }
-
-(function () {
-  function initStreamingLineChart(el) {
+(() => {
+  const initChart = (el) => {
     if (!el || el.dataset.sseChartInitialized === "true") return;
 
-    if (typeof window === "undefined" || !window.echarts) {
-      console.error(
-        "ECharts is not available on window.echarts. " +
-          "Make sure echarts.min.js is loaded before sse-chart.js.",
-      );
-      return;
-    }
+    // Ensure ECharts is loaded (Full version required for this specific script)
+    if (!window.echarts) return console.error("ECharts missing");
 
-    var existing = window.echarts.getInstanceByDom(el);
-    var chart = existing || window.echarts.init(el);
+    const chart = window.echarts.init(el);
+    let xData = [];
+    let yData = [];
 
-    var xData = [];
-    var yData = [];
-
-    var chartType = el.getAttribute("data-sse-chart") || "line";
-
-    var maxPoints = parseInt(
-      el.getAttribute("data-sse-max-points") || "50",
-      10,
-    );
+    const chartType = el.dataset.sseChart || "line";
+    const maxPoints = parseInt(el.dataset.sseMaxPoints || "50");
 
     chart.setOption({
-      tooltip: {
-        trigger: "axis",
-        axisPointer: { type: chartType === "bar" ? "shadow" : "line" },
-      },
+      tooltip: { trigger: "axis" },
       xAxis: { type: "category", data: xData },
       yAxis: { type: "value" },
-      series: [
-        {
-          type: chartType,
-          data: yData,
-          smooth: chartType === "line",
-          areaStyle: chartType === "line" ? {} : undefined,
-          emphasis: {
-            focus: "series",
-            label: {
-              show: true,
-              position: chartType === "bar" ? "top" : "right",
-            },
-          },
-        },
-      ],
+      series: [{ type: chartType, data: yData }]
     });
 
-    var url = el.getAttribute("data-sse-url") || "/charts/sse";
-    var eventName = el.getAttribute("data-sse-event") || "chart-update";
+    const source = new EventSource(el.dataset.sseUrl || "/charts/sse");
+    
+    source.addEventListener(el.dataset.sseEvent || "chart-update", (ev) => {
+      const point = JSON.parse(ev.data);
+      xData.push(point.label);
+      yData.push(point.value);
 
-    var source = new EventSource(url);
-
-    source.addEventListener(eventName, function (ev) {
-      try {
-        var point = JSON.parse(ev.data);
-        xData.push(point.label);
-        yData.push(point.value);
-
-        if (xData.length > maxPoints) {
-          xData.shift();
-          yData.shift();
-        }
-
-        chart.setOption({
-          xAxis: { data: xData },
-          series: [{ data: yData }],
-        });
-      } catch (e) {
-        console.error("Invalid SSE chart payload", e);
+      if (xData.length > maxPoints) {
+        xData.shift();
+        yData.shift();
       }
+
+      chart.setOption({
+        xAxis: { data: xData },
+        series: [{ data: yData }]
+      });
     });
-
+    // For cleanup: Close SSE and dispose chart when element is removed
+    el._sseSource = source;
+    el._chartInstance = chart;
     el.dataset.sseChartInitialized = "true";
-  }
+  };
 
-  function scanAndInit(root) {
-    var scope = root || document;
-    var els = scope.querySelectorAll("[data-sse-chart]");
-    for (var i = 0; i < els.length; i++) {
-      initStreamingLineChart(els[i]);
-    }
-  }
+  // HTMX Integration
+  document.addEventListener("htmx:afterProcessNode", (e) => {
+    const target = e.target;
+    if (target.hasAttribute?.("data-sse-chart")) initChart(target);
+    target.querySelectorAll?.("[data-sse-chart]").forEach(initChart);
+  });
 
-  // Re-run after HTMX swaps, so charts loaded via hx-get / hx-swap are initialized
-  document.addEventListener("htmx:afterSwap", function (evt) {
-    scanAndInit(evt.target || document);
+  document.addEventListener("htmx:beforeCleanupElement", (e) => {
+    const el = e.target;
+    if (el._sseSource) el._sseSource.close();
+    if (el._chartInstance) el._chartInstance.dispose();
   });
 })();
-

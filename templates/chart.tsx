@@ -41,6 +41,7 @@ export const Chart = ({ chart }: { chart: string }) => {
           id="sse-chart"
           data-sse-chart="line"
           data-sse-url="/charts/sse"
+          data-sse-event="chart-update"
           style={{ width: 600, height: 400, border: "1px solid #eee" }}
         />
       </section>
@@ -60,6 +61,7 @@ export const Chart = ({ chart }: { chart: string }) => {
           id="sse-chart-bar"
           data-sse-chart="bar"
           data-sse-url="/charts/sse"
+          data-sse-event="chart-update"
           style={{ width: 600, height: 400, border: "1px solid #eee" }}
         />
       </section>

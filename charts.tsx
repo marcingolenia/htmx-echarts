@@ -2,10 +2,10 @@ import { Hono } from "hono";
 import * as echarts from "echarts";
 import { streamSSE } from "hono/streaming";
 import { Chart } from "./templates/chart";
+import { Layout } from "./templates/layout";
 
 const app = new Hono();
 
-// 1. Helper to generate the ECharts SVG (server-rendered bar chart)
 export const getChartSvg = (data: number[]) => {
   const chart = echarts.init(null, null, {
     renderer: "svg",
@@ -40,7 +40,12 @@ export const getChartSvg = (data: number[]) => {
 
 // Page with both SSR+HTMX example and SSE+client ECharts example
 app.get("/", (c) => {
-  return c.html(Chart({ chart: getChartSvg([10, 20, 30, 40, 50]) }));
+  if (c.req.header("hx-request") === "true") {
+    return c.html(Chart({ chart: getChartSvg([10, 20, 30, 40, 50]) }));
+  }
+  else {
+    return c.html(Layout({ children: Chart({ chart: getChartSvg([10, 20, 30, 40, 50]) }) }));
+  }
 });
 
 // HTMX endpoint to re-render the server-side SVG chart with new random data
