@@ -1,5 +1,13 @@
-// HTMX + ECharts SSE helper
-// Initializes any element with [data-sse-chart] and keeps it updated from an SSE endpoint.
+// Simple helper for SSE-driven ECharts line charts in the browser.
+// Usage pattern:
+//   1) Add a container:
+//        <div
+//          id="my-streaming-chart"
+//          data-sse-chart="line"
+//          data-sse-url="/charts/sse"
+//          data-sse-event="chart-update"      (optional, default: "chart-update")
+//          data-sse-max-points="50"           (optional, default: 50)
+//        ></div>
 (function () {
   function initSseChart(el) {
     if (!el || el.dataset.sseChartInitialized === "true") return;
@@ -22,7 +30,6 @@
       series: [{ type: chartType, data: yData }],
     });
 
-    // Handle responsiveness
     const resizeObserver = new ResizeObserver(() => chart.resize());
     resizeObserver.observe(el);
 
@@ -81,7 +88,6 @@
     });
   }
 
-  // Initial page load
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
       scanAndInit(document);
@@ -90,18 +96,14 @@
     scanAndInit(document);
   }
 
-  // After HTMX swaps in new content
   document.addEventListener("htmx:afterSwap", function (evt) {
     const target = evt.target || (evt.detail && evt.detail.target) || document;
     scanAndInit(target);
   });
 
-  // Before HTMX cleans up elements, close SSE + dispose charts
   document.addEventListener("htmx:beforeCleanupElement", function (evt) {
     const target = evt.target || (evt.detail && evt.detail.target) || null;
     if (!target) return;
     cleanupSseCharts(target);
   });
-
-  console.log("htmx-echarts-sse.js loaded");
 })();

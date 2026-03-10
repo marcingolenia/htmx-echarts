@@ -28,7 +28,7 @@ export const Chart = ({ chart }: { chart: string }) => {
       {/* 2. Client-side ECharts chart that receives data over SSE */}
       <section
         id="sse-chart-section"
-        style={{ width: "100%", maxWidth: 640, marginBottom: 40 }}
+        style={{ width: "100%", marginBottom: 40 }}
       >
         <h2>SSE ECharts (client-side streaming)</h2>
         <p>
@@ -42,7 +42,7 @@ export const Chart = ({ chart }: { chart: string }) => {
           data-sse-chart="line"
           data-sse-url="/charts/sse"
           data-sse-event="chart-update"
-          style={{ width: 600, height: 400, border: "1px solid #eee" }}
+          style={{ height: 400, border: "1px solid #eee" }}
         />
       </section>
       {/* 3. Client-side ECharts chart bar that receives data over SSE */}
