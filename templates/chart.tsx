@@ -98,7 +98,24 @@ export const Chart = ({ chart }: { chart: string }) => {
           data-sse-event="chart-update"
           style={{ width: "100%", height: 400, border: "1px solid #eee" }}
         />
-      </section>  
+      </section>
+
+      {/* 4. Client-side pie chart (static fetch, no SSE) */}
+      <section
+        id="pie-chart-section"
+        style={{ width: "100%", maxWidth: 640, marginBottom: 40 }}
+      >
+        <h2>Pie chart (static data)</h2>
+        <p>
+          Fetches a full ECharts option once from the server. No SSE.
+        </p>
+
+        <div
+          data-chart-type="pie"
+          data-url="/charts/pie"
+          style={{ width: "100%", height: 400, border: "1px solid #eee" }}
+        />
+      </section>
     </div>
   );
 };

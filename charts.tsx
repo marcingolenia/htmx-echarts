@@ -62,6 +62,36 @@ app.get("/update-chart", (c) => {
   );
 });
 
+// Static JSON endpoint: full ECharts option for a pie chart (no SSE)
+app.get("/pie", (c) => {
+  const option: EChartsOption = {
+    tooltip: { trigger: "item" },
+    legend: { top: "5%", left: "center" },
+    series: [
+      {
+        name: "Share",
+        type: "pie",
+        radius: ["40%", "70%"],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 10,
+          borderColor: "#fff",
+          borderWidth: 2,
+        },
+        label: { show: true, formatter: "{b}: {d}%" },
+        data: [
+          { value: 1048, name: "Search" },
+          { value: 735, name: "Direct" },
+          { value: 580, name: "Email" },
+          { value: 484, name: "Union Ads" },
+          { value: 300, name: "Video" },
+        ],
+      },
+    ],
+  };
+  return c.json(option);
+});
+
 // SSE endpoint for streaming a single-series ECharts option
 app.get("/sse", (c) => {
   return streamSSE(c, async (stream) => {
