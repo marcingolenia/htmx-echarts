@@ -38,9 +38,8 @@ export const Chart = ({ chart }: { chart: string }) => {
         </p>
 
         <div
-          id="sse-chart"
-          data-sse-chart="line"
-          data-sse-url="/charts/sse"
+          data-chart-type="line"
+          data-url="/charts/sse"
           data-sse-event="chart-update"
           style={{ height: 400, border: "1px solid #eee" }}
         />
@@ -58,9 +57,8 @@ export const Chart = ({ chart }: { chart: string }) => {
         </p>
 
         <div
-          id="sse-chart-bar"
-          data-sse-chart="bar"
-          data-sse-url="/charts/sse"
+          data-chart-type="bar"
+          data-url="/charts/sse"
           data-sse-event="chart-update"
           style={{ width: 600, height: 400, border: "1px solid #eee" }}
         />

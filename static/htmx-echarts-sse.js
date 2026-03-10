@@ -1,16 +1,6 @@
-// Simple helper for SSE-driven ECharts line charts in the browser.
-// Usage pattern:
-//   1) Add a container:
-//        <div
-//          id="my-streaming-chart"
-//          data-sse-chart="line"
-//          data-sse-url="/charts/sse"
-//          data-sse-event="chart-update"      (optional, default: "chart-update")
-//          data-sse-max-points="50"           (optional, default: 50)
-//        ></div>
 (function () {
-  function initSseChart(el) {
-    if (!el || el.dataset.sseChartInitialized === "true") return;
+  function initEChart(el) {
+    if (!el || el.dataset.eChartInitialized === "true") return;
     if (!window.echarts) {
       console.error("ECharts library missing from window.");
       return;
@@ -20,8 +10,8 @@
     let xData = [];
     let yData = [];
 
-    const chartType = el.dataset.sseChart || "line";
-    const maxPoints = parseInt(el.dataset.sseMaxPoints || "50", 10);
+    const chartType = el.dataset.chartType || "line";
+    const maxPoints = parseInt(el.dataset.maxPoints || "50", 10);
 
     chart.setOption({
       tooltip: { trigger: "axis" },
@@ -33,14 +23,50 @@
     const resizeObserver = new ResizeObserver(() => chart.resize());
     resizeObserver.observe(el);
 
-    const url = el.dataset.sseUrl;
+    const url = el.dataset.url;
+    const eventName = el.dataset.sseEvent;
+
     if (!url) {
-      console.warn("data-sse-url is required for echarts SSE charts");
+      console.warn("data-url is required for echarts charts");
+      el._chartInstance = chart;
+      el._resizeObserver = resizeObserver;
+      el.dataset.eChartInitialized = "true";
       return;
     }
 
+    // If no event name is provided, treat this as a static chart
+    // and fetch data once from the URL instead of opening SSE.
+    if (!eventName) {
+      fetch(url)
+        .then((r) => r.json())
+        .then((data) => {
+          const points = Array.isArray(data)
+            ? data
+            : Array.isArray(data.points)
+            ? data.points
+            : [];
+          points.slice(-maxPoints).forEach((p) => {
+            xData.push(p.label);
+            yData.push(p.value);
+          });
+          chart.setOption({
+            xAxis: { data: xData },
+            series: [{ data: yData }],
+          });
+        })
+        .catch((err) => {
+          console.error("Error fetching initial chart data", err);
+        })
+        .finally(() => {
+          el._chartInstance = chart;
+          el._resizeObserver = resizeObserver;
+          el.dataset.eChartInitialized = "true";
+        });
+      return;
+    }
+
+    // SSE mode: open an EventSource and stream updates
     const source = new EventSource(url);
-    const eventName = el.dataset.sseEvent || "message";
 
     source.addEventListener(eventName, (ev) => {
       try {
@@ -65,18 +91,18 @@
     el._sseSource = source;
     el._chartInstance = chart;
     el._resizeObserver = resizeObserver;
-    el.dataset.sseChartInitialized = "true";
+    el.dataset.eChartInitialized = "true";
   }
 
   function scanAndInit(root) {
     if (!root || !root.querySelectorAll) return;
-    const els = root.querySelectorAll("[data-sse-chart]");
-    els.forEach(initSseChart);
+    const els = root.querySelectorAll("[data-chart-type]");
+    els.forEach(initEChart);
   }
 
-  function cleanupSseCharts(root) {
+  function cleanupECharts(root) {
     if (!root || !root.querySelectorAll) return;
-    const els = root.querySelectorAll("[data-sse-chart]");
+    const els = root.querySelectorAll("[data-chart-type]");
     els.forEach((el) => {
       if (el._sseSource) el._sseSource.close();
       if (el._chartInstance) el._chartInstance.dispose();
@@ -84,7 +110,7 @@
       el._sseSource = null;
       el._chartInstance = null;
       el._resizeObserver = null;
-      el.dataset.sseChartInitialized = "false";
+      el.dataset.eChartInitialized = "false";
     });
   }
 
@@ -104,6 +130,6 @@
   document.addEventListener("htmx:beforeCleanupElement", function (evt) {
     const target = evt.target || (evt.detail && evt.detail.target) || null;
     if (!target) return;
-    cleanupSseCharts(target);
+    cleanupECharts(target);
   });
 })();
