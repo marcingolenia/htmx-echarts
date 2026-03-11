@@ -12,7 +12,6 @@ export const Layout = ({ children }: { children?: unknown }) => {
       </head>
       <body hx-ext="echarts">
         <h1>tessa</h1>
-        <img src="/static/unnamed.png" alt="Lytic" />
 
         <button
           hx-get="/api/hello"

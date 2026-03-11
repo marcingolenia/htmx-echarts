@@ -195,9 +195,9 @@ app.get("/sse-multi", (c) => {
   });
 });
 
-// SSE endpoint: every second send full option built from "latest 50 points".
-// Simulates a backend that filters in SQL (e.g. ORDER BY ts DESC LIMIT 50) and
-// returns that window — no shifting; we just append and send slice(-50).
+// SSE endpoint: every second send full option built from "latest 10 points".
+// Simulates a backend that filters in SQL (e.g. ORDER BY ts DESC LIMIT 10) and
+// returns that window — no shifting; we just append and send slice(-10).
 const LATEST_WINDOW = 10;
 
 app.get("/sse-latest", (c) => {
@@ -238,6 +238,36 @@ app.get("/sse-latest", (c) => {
       await stream.sleep(1000);
     }
   });
+});
+
+
+let data = [...Array(10).keys()].map(i => Math.random() * 100);
+function labelsForLength(len: number, nowMs = Date.now()): string[] {
+  // last element: now - 1s, before-last: now - 2s, ...
+  return Array.from({ length: len }, (_, i) =>
+    new Date(nowMs - (len - i) * 1000).toLocaleTimeString(),
+  );
+}
+
+let labels = labelsForLength(data.length);
+app.get("/line-polling", (c) => {
+  data.shift();
+  data.push(Math.random() * 100);
+  labels.shift();
+  labels.push(new Date().toLocaleTimeString());
+  const option: EChartsOption = {
+    tooltip: { trigger: "axis" },
+    xAxis: { type: "category", data: labels },
+    yAxis: { type: "value" },
+    series: [
+      {
+        name: "Random",
+        type: "line",
+        data: data,
+      },
+    ],
+  };
+  return c.json(option);
 });
 
 export default app;

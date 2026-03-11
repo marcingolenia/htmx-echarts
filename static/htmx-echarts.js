@@ -15,6 +15,32 @@ const createChart = (el) => {
   return chart;
 };
 
+const parseDurationMs = (raw) => {
+  if (!raw) return null;
+  const v = String(raw).trim();
+  const m = v.match(/^(\d+(?:\.\d+)?)(ms|s)?$/i);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const unit = (m[2] || "ms").toLowerCase();
+  return unit === "s" ? Math.round(n * 1000) : Math.round(n);
+};
+
+const parseDataUrl = (raw) => {
+  const s = String(raw || "").trim();
+  if (!s) return { url: "", pollMs: null };
+  const parts = s.split(/\s+/).filter(Boolean);
+  const url = parts[0] || "";
+  let pollMs = null;
+
+  for (const token of parts.slice(1)) {
+    const m = token.match(/^poll:(.+)$/i);
+    if (m) pollMs = parseDurationMs(m[1]);
+  }
+
+  return { url, pollMs };
+};
+
 const remoteFetch = (chart, url) => {
   fetch(url)
   .then((r) => r.json())
@@ -51,7 +77,7 @@ const remoteSSE = (chart, url, eventName) => {
       console.error("ECharts library missing from window.");
       return;
     }
-    const url = el.dataset.url;
+    const { url, pollMs } = parseDataUrl(el.dataset.url);
     const eventName = el.dataset.sseEvent;
     if (!url) {
       console.error("Missing data-url on chart element", el);
@@ -68,6 +94,9 @@ const remoteSSE = (chart, url, eventName) => {
       );
     } else {
       remoteFetch(chart, url);
+      if (pollMs) {
+        el._pollIntervalId = setInterval(() => remoteFetch(chart, url), pollMs);
+      }
     }
   };
 
@@ -82,9 +111,11 @@ const remoteSSE = (chart, url, eventName) => {
     const els = root.querySelectorAll("[data-chart-type]");
     els.forEach((el) => {
       if (el._sseSource) el._sseSource.close();
+      if (el._pollIntervalId) clearInterval(el._pollIntervalId);
       if (el._chartInstance) el._chartInstance.dispose();
       if (el._resizeObserver) el._resizeObserver.disconnect();
       el._sseSource = null;
+      el._pollIntervalId = null;
       el._chartInstance = null;
       el._resizeObserver = null;
     });
