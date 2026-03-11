@@ -50,29 +50,29 @@ You need:
 - **ECharts** (browser bundle)
 - **`htmx-echarts.js`** (this extension)
 
-Example layout head:
+Example layout head (local bundle):
 
-```tsx
+```html
 <head>
   <meta charSet="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Analytica</title>
-
-  {/* HTMX */}
+  /* HTMX */
   <script src="/static/htmx.min.js" defer></script>
-
-  {/* ECharts must be loaded before the helper */}
+  /* ECharts must be loaded before the helper */
   <script
     src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"
     defer
   ></script>
-
-  {/* Extension file */}
+  /* Extension file */
   <script src="/static/htmx-echarts.js" defer></script>
+  /* or cnd */
+  <script src="https://cdn.jsdelivr.net/npm/htmx-echarts@0.1.0/dist/htmx-echarts.min.js" defer></script>
 </head>
 ```
 
 `htmx-echarts.js` assumes `window.echarts` is available.
+
 
 ### 2. Enable the extension
 
