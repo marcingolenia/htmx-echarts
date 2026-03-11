@@ -119,12 +119,9 @@ export const Chart = ({ chart }: { chart: string }) => {
             {/* 4. Client-side line chart (static fetch, 1sec polling) */}
       <section
         id="pie-chart-section"
-        style={{ width: "100%", maxWidth: 640, marginBottom: 40 }}
+        style={{ width: "100%", maxWidth: 740, marginBottom: 40 }}
       >
-        <h2>Pie chart (static data)</h2>
-        <p>
-          Fetches a full ECharts option once from the server. No SSE.
-        </p>
+        <h2>Line chart polling every 1000ms</h2>
 
         <div
           data-chart-type="pie"
