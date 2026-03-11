@@ -2,6 +2,8 @@
 
 An `htmx` extension (`echarts`) that connects `htmx`, `ECharts`, and Server-Sent Events (SSE) for live-updating (or statically-fetched) charts.
 
+![demo](./charts_demo.gif)
+
 This repository contains htmx-echarts extension and demo in bun. You can run demo following this steps: 
 
 To install dependencies:
