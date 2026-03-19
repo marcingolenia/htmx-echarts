@@ -86,48 +86,6 @@ Activate the extension on any region that contains charts (commonly `body`):
 
 ---
 
-## How it works
-
-- The extension registers as `echarts` via `htmx.defineExtension("echarts", ...)`.
-- On **`htmx:load`** within an `hx-ext="echarts"` region, it scans the loaded fragment for `[data-chart-type]` and initializes charts.
-- On **`htmx:historyRestore`** it first cleans up charts in the restored fragment and then re-initializes them.
-- On **HTMX cleanup** (`htmx:beforeCleanupElement`), for any subtree being removed inside an `hx-ext="echarts"` region, it cleans up charts.
-- For each chart element:
-  - Creates an ECharts instance on that element.
-  - Attaches a `ResizeObserver` so the chart resizes with its container.
-  - Reads:
-    - `data-url`: endpoint for either SSE or static JSON fetch (optionally with polling modifiers).
-    - `data-sse-event`: when present, enables SSE streaming mode.
-  - **Static mode** (no `data-sse-event`):
-    - Parses `data-url` into:
-      - `url`: the request URL.
-      - Optional `poll`: polling interval in milliseconds (see **Polling** below).
-    - Performs `fetch(url)` once on initialization.
-    - Expects the response body to be a **full ECharts option object**.
-    - Calls `chart.setOption(option)` with that object.
-    - If `poll` is set, sets up a `setInterval` to re-fetch the same URL every `poll` milliseconds and update the chart with the latest option.
-  - **SSE mode** (`data-sse-event` present):
-    - Creates an `EventSource(url)`.
-    - Listens for SSE events with the given name.
-    - For each event:
-      - Parses `event.data` as JSON.
-      - Expects a **full (or partial) ECharts option object**.
-      - Calls `chart.setOption(option)` to update the chart.
-- On cleanup it:
-  - Closes any `EventSource`s.
-  - Clears any polling intervals.
-  - Disposes ECharts instances.
-  - Disconnects `ResizeObserver`s.
-  - Clears internal references on the chart elements.
-
-So charts are:
-
-- Automatically initialized when they appear (initial render or HTMX swap).
-- Continuously updated from SSE.
-- Properly cleaned up when removed, avoiding memory and connection leaks.
-
----
-
 ## Usage
 
 ### Frontend: Markup
@@ -376,46 +334,46 @@ app.get("/sse", (req, res) => {
 
 #### ASP.NET Core (C#) example
 
-Minimal API using `IResult` and `HttpResponse`:
+Minimal API using native SSE support (`TypedResults.ServerSentEvents`):
 
 ```csharp
+using System.Net;
+using System.Runtime.CompilerServices;
+
 var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
 
-app.MapGet("/sse", async context =>
+app.MapGet("/sse", (CancellationToken cancellationToken) =>
 {
-    var response = context.Response;
-    response.Headers.Add("Content-Type", "text/event-stream");
-    response.Headers.Add("Cache-Control", "no-cache");
-    response.Headers.Add("Connection", "keep-alive");
-
-    var id = 0;
-    var cancellation = context.RequestAborted;
-    var writer = new StreamWriter(response.Body);
-
-    while (!cancellation.IsCancellationRequested)
+    async IAsyncEnumerable<SseItem<object>> GetChartUpdates(
+        [EnumeratorCancellation] CancellationToken ct)
     {
-        // build your option here (latest N points)
-        var option = new {
-            tooltip = new { trigger = "axis" },
-            xAxis = new { type = "category", data = new[] { "A", "B", "C" } },
-            yAxis = new { type = "value" },
-            series = new[] {
-                new { name = "Random", type = "line", data = new[] { 1, 2, 3 } }
-            }
-        };
+        var id = 0;
 
-        var json = JsonSerializer.Serialize(option);
+        while (!ct.IsCancellationRequested)
+        {
+            // Build your option here (e.g. latest N points)
+            var option = new
+            {
+                tooltip = new { trigger = "axis" },
+                xAxis = new { type = "category", data = new[] { "A", "B", "C" } },
+                yAxis = new { type = "value" },
+                series = new[]
+                {
+                    new { name = "Random", type = "line", data = new[] { 1, 2, 3 } }
+                }
+            };
 
-        await writer.WriteAsync(
-            $"id: {id++}\n" +
-            $"event: chart-update\n" +
-            $"data: {json}\n\n"
-        );
-        await writer.FlushAsync();
+            yield return new SseItem<object>(option, eventType: "chart-update")
+            {
+                EventId = (id++).ToString()
+            };
 
-        await Task.Delay(1000, cancellation);
+            await Task.Delay(1000, ct);
+        }
     }
+
+    return TypedResults.ServerSentEvents(GetChartUpdates(cancellationToken));
 });
 
 app.Run();
@@ -487,6 +445,49 @@ This endpoint:
 - Uses a generator (`event_stream`) to yield SSE frames.
 - Sets `mimetype="text/event-stream"` so browsers treat it as an SSE stream.
 - Sends `chart-update` events with payloads that are **full ECharts options**.
+
+---
+
+## How it works
+
+- The extension registers as `echarts` via `htmx.defineExtension("echarts", ...)`.
+- On **`htmx:load`** within an `hx-ext="echarts"` region, it scans the loaded fragment for `[data-chart-type]` and initializes charts.
+- On **`htmx:historyRestore`** it first cleans up charts in the restored fragment and then re-initializes them.
+- On **HTMX cleanup** (`htmx:beforeCleanupElement`), for any subtree being removed inside an `hx-ext="echarts"` region, it cleans up charts.
+- For each chart element:
+  - Creates an ECharts instance on that element.
+  - Attaches a `ResizeObserver` so the chart resizes with its container.
+  - Reads:
+    - `data-url`: endpoint for either SSE or static JSON fetch (optionally with polling modifiers).
+    - `data-sse-event`: when present, enables SSE streaming mode.
+  - **Static mode** (no `data-sse-event`):
+    - Parses `data-url` into:
+      - `url`: the request URL.
+      - Optional `poll`: polling interval in milliseconds (see **Polling** below).
+    - Performs `fetch(url)` once on initialization.
+    - Expects the response body to be a **full ECharts option object**.
+    - Calls `chart.setOption(option)` with that object.
+    - If `poll` is set, sets up a `setInterval` to re-fetch the same URL every `poll` milliseconds and update the chart with the latest option.
+  - **SSE mode** (`data-sse-event` present):
+    - Creates an `EventSource(url)`.
+    - Listens for SSE events with the given name.
+    - For each event:
+      - Parses `event.data` as JSON.
+      - Expects a **full (or partial) ECharts option object**.
+      - Calls `chart.setOption(option)` to update the chart.
+- On cleanup it:
+  - Closes any `EventSource`s.
+  - Clears any polling intervals.
+  - Disposes ECharts instances.
+  - Disconnects `ResizeObserver`s.
+  - Clears internal references on the chart elements.
+
+So charts are:
+
+- Automatically initialized when they appear (initial render or HTMX swap).
+- Continuously updated from SSE.
+- Properly cleaned up when removed, avoiding memory and connection leaks.
+
 
 
 
