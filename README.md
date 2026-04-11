@@ -189,6 +189,41 @@ In this mode:
 - It then re-fetches the same URL every `1000ms` and applies the latest option.
 - No SSE connection is opened.
 
+#### Empty state (“no data”) via `graphic`
+
+When there is nothing to plot, your API can still return a **full ECharts option**: keep axes/series (with empty `data`) and add a [`graphic`](https://echarts.apache.org/en/option.html#graphic) text element so the chart area shows a message instead of an empty grid.
+
+```json
+{
+  "tooltip": { "trigger": "axis" },
+  "xAxis": { "type": "category", "data": [] },
+  "yAxis": { "type": "value" },
+  "series": [{ "name": "Example", "type": "bar", "data": [] }],
+  "graphic": {
+    "type": "text",
+    "left": "center",
+    "top": "middle",
+    "style": {
+      "text": "No data available",
+      "fontSize": 16,
+      "fill": "#999"
+    }
+  }
+}
+```
+
+Markup is the same as any other static fetch:
+
+```html
+<div
+  data-chart-type="bar"
+  data-url="/charts/empty-placeholder"
+  style="height: 400px; border: 1px solid #eee;"
+></div>
+```
+
+The demo app serves that JSON from `GET /charts/empty-placeholder` so you can try it without wiring your own empty-state branch yet.
+
 **Supported attributes:**
 
 - `data-chart-type` (optional): chart type hint (e.g. `"line"`, `"bar"`, `"scatter"`, `"pie"`). Helpful for semantics but not required, since the option comes from the backend.

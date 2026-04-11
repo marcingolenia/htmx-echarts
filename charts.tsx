@@ -92,6 +92,27 @@ app.get("/pie", (c) => {
   return c.json(option);
 });
 
+// Static JSON: empty series with a centered "no data" label via `graphic`
+app.get("/empty-placeholder", (c) => {
+  const option: EChartsOption = {
+    tooltip: { trigger: "axis" },
+    xAxis: { type: "category", data: [] },
+    yAxis: { type: "value" },
+    series: [{ name: "Example", type: "bar", data: [] }],
+    graphic: {
+      type: "text",
+      left: "center",
+      top: "middle",
+      style: {
+        text: "No data available",
+        fontSize: 16,
+        fill: "#999",
+      },
+    },
+  };
+  return c.json(option);
+});
+
 // SSE endpoint for streaming a single-series ECharts option
 app.get("/sse", (c) => {
   return streamSSE(c, async (stream) => {

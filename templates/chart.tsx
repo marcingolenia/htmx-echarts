@@ -116,6 +116,29 @@ export const Chart = ({ chart }: { chart: string }) => {
           style={{ width: "100%", height: 400, border: "1px solid #eee" }}
         />
       </section>
+
+      {/* Empty state: backend returns option with graphic text (no series data) */}
+      <section
+        id="empty-chart-section"
+        style={{ width: "100%", maxWidth: 640, marginBottom: 40 }}
+      >
+        <h2>No data placeholder (<code>graphic</code>)</h2>
+        <p>
+          When there is nothing to plot, the API can still return a valid
+          option: empty axes/series plus a{" "}
+          <a href="https://echarts.apache.org/en/option.html#graphic">
+            graphic
+          </a>{" "}
+          element so the chart area shows a message instead of a blank box.
+        </p>
+
+        <div
+          data-chart-type="bar"
+          data-url="/charts/empty-placeholder"
+          style={{ width: "100%", height: 400, border: "1px solid #eee" }}
+        />
+      </section>
+
             {/* 4. Client-side line chart (static fetch, 1sec polling) */}
       <section
         id="pie-chart-section"
