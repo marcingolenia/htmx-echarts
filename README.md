@@ -194,6 +194,42 @@ In this mode:
 - `data-chart-type` (optional): chart type hint (e.g. `"line"`, `"bar"`, `"scatter"`, `"pie"`). Helpful for semantics but not required, since the option comes from the backend.
 - `data-url` (required): URL used either for SSE streaming or static JSON fetch, optionally followed by polling modifiers (see **Polling** below).
 - `data-sse-event` (optional): when set, the helper opens an `EventSource` to `data-url` and listens for this SSE event name; when omitted, the helper performs a `fetch(url)` and treats the response as static data (optionally with polling).
+- `data-theme` (optional): registered ECharts theme name passed to `echarts.init` (see **Theme** below). Omit for the default look.
+
+### Theme
+
+The extension reads `data-theme` and passes it as the [theme argument](https://echarts.apache.org/en/api.html#echarts.init) to `echarts.init(dom, theme)`. That name must already be registered on `window.echarts`. The main `echarts.min.js` bundle alone does **not** register built-in themes such as `dark`; you load them as extra scripts (or call `echarts.registerTheme` yourself).
+
+Load theme files from the same ECharts version you use for the core bundle, **after** `echarts.min.js` and **before** `htmx-echarts.js`:
+
+```html
+<script
+  src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"
+  defer
+></script>
+<script
+  src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/theme/dark.js"
+  defer
+></script>
+<script src="/static/htmx-echarts.js" defer></script>
+```
+
+Example chart using the dark theme:
+
+```html
+<div
+  data-chart-type="line"
+  data-url="/charts/line-polling poll:1000ms"
+  data-theme="dark"
+  style="height: 400px; border: 1px solid #eee;"
+></div>
+```
+
+Bundled theme scripts live under `echarts/theme/` on the CDN (for example `macarons.js`, `vintage.js`). Each file calls `echarts.registerTheme` with a fixed name; use that exact string in `data-theme`.
+
+For a **custom** theme, run `echarts.registerTheme("myTheme", { /* theme object */ })` before `htmx-echarts.js` executes, then set `data-theme="myTheme"` on the chart element.
+
+The official [theme download / gallery page](https://echarts.apache.org/en/download-theme.html) lists more options and includes the **theme builder**; nothing in this extension stops you from registering a theme you export from there (same `registerTheme` + `data-theme` flow as any other custom theme).
 
 ### Polling
 
@@ -460,6 +496,7 @@ This endpoint:
   - Reads:
     - `data-url`: endpoint for either SSE or static JSON fetch (optionally with polling modifiers).
     - `data-sse-event`: when present, enables SSE streaming mode.
+    - `data-theme`: optional registered theme name for `echarts.init` (see **Theme**).
   - **Static mode** (no `data-sse-event`):
     - Parses `data-url` into:
       - `url`: the request URL.

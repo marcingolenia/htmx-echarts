@@ -5,7 +5,7 @@
 // - fetch a static dataset once from data-url (when data-sse-event is absent).
 
 const createChart = (el) => {
-  const chart = window.echarts.init(el);
+  const chart = window.echarts.init(el, el.dataset.theme);
 
   const resizeObserver = new ResizeObserver(() => chart.resize());
   resizeObserver.observe(el);

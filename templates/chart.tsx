@@ -126,6 +126,7 @@ export const Chart = ({ chart }: { chart: string }) => {
         <div
           data-chart-type="pie"
           data-url="/charts/line-polling poll:1000ms"
+          data-theme="dark"
           style={{ width: "100%", height: 400, border: "1px solid #eee" }}
         />
       </section>

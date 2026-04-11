@@ -8,6 +8,7 @@ export const Layout = ({ children }: { children?: unknown }) => {
         <script src="/static/htmx.min.js.js" defer></script>
         {/* Browser ECharts bundle so window.echarts is available */}
         <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js" defer></script>
+        <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/theme/dark.js" defer></script>
         <script src="/static/htmx-echarts.js" defer></script>
       </head>
       <body hx-ext="echarts">
