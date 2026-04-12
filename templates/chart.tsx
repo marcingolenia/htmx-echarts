@@ -117,6 +117,34 @@ export const Chart = ({ chart }: { chart: string }) => {
         />
       </section>
 
+      {/* ECharts → HTMX: chart-click / chart-hover for dashboards */}
+      <section
+        id="chart-events-section"
+        style={{ width: "100%", maxWidth: 640, marginBottom: 40 }}
+      >
+        <h2>Chart events (HTMX bridge)</h2>
+        <p>
+          Click or hover a pie slice and open the browser console:{" "}
+          <code>chart-click</code> and <code>chart-hover</code> fire on this
+          element with <code>event.detail</code> (series name, value, indices,
+          etc.). Use <code>hx-trigger=&quot;chart-click&quot;</code> on the same
+          chart container to load fragments (e.g. a detail table) without extra
+          JavaScript.
+        </p>
+
+        <div
+          data-chart-type="pie"
+          data-url="/charts/pie"
+          {...{
+            "hx-on::chart-click":
+              "console.log('chart-click', event.detail)",
+            "hx-on::chart-hover":
+              "console.log('chart-hover', event.detail)",
+          }}
+          style={{ width: "100%", height: 400, border: "1px solid #eee" }}
+        />
+      </section>
+
       {/* Empty state: backend returns option with graphic text (no series data) */}
       <section
         id="empty-chart-section"
