@@ -136,12 +136,20 @@ export const Chart = ({ chart }: { chart: string }) => {
           data-chart-type="pie"
           data-url="/charts/pie"
           {...{
-            "hx-on::chart-click":
+            "hx-get": "/charts/pie-detail",
+            "hx-trigger": "chart-hover",
+            "hx-target": "#pie-detail",
+            "hx-vals": 'js:{"name": event.detail.name}',
+            "hx-on:chart-click":
               "console.log('chart-click', event.detail)",
-            "hx-on::chart-hover":
+            "hx-on:chart-hover":
               "console.log('chart-hover', event.detail)",
           }}
           style={{ width: "100%", height: 400, border: "1px solid #eee" }}
+        />
+        <div
+          id="pie-detail"
+          style={{ marginTop: 16, minHeight: 80 }}
         />
       </section>
 

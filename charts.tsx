@@ -291,4 +291,45 @@ app.get("/line-polling", (c) => {
   return c.json(option);
 });
 
+type PieBreakdown = { label: string; value: number }[];
+
+const PIE_BREAKDOWN: Record<string, PieBreakdown> = {
+  Search:     [{ label: "Organic Search", value: 648 }, { label: "Paid Search", value: 400 }],
+  Direct:     [{ label: "Direct URL", value: 435 }, { label: "Bookmarks", value: 300 }],
+  Email:      [{ label: "Direct Email", value: 350 }, { label: "Marketing Campaign", value: 230 }],
+  "Union Ads":[{ label: "Display Ads", value: 284 }, { label: "Sponsored Posts", value: 200 }],
+  Video:      [{ label: "YouTube", value: 200 }, { label: "Social Video", value: 100 }],
+};
+
+app.get("/pie-detail", (c) => {
+  const name = c.req.query("name") ?? "";
+  const rows = PIE_BREAKDOWN[name];
+  if (!rows) return c.html(`<p style="color:#999">No breakdown available for <strong>${name}</strong>.</p>`);
+
+  const total = rows.reduce((s, r) => s + r.value, 0);
+  const tableRows = rows
+    .map(
+      (r) => `<tr>
+        <td style="padding:6px 12px;border:1px solid #ddd">${r.label}</td>
+        <td style="padding:6px 12px;border:1px solid #ddd;text-align:right">${r.value}</td>
+        <td style="padding:6px 12px;border:1px solid #ddd;text-align:right">${Math.round((r.value / total) * 100)}%</td>
+      </tr>`
+    )
+    .join("");
+
+  return c.html(`
+    <h3 style="margin:0 0 8px">${name} — breakdown</h3>
+    <table style="border-collapse:collapse;width:100%;font-size:14px">
+      <thead>
+        <tr style="background:#f5f5f5">
+          <th style="padding:6px 12px;border:1px solid #ddd;text-align:left">Source</th>
+          <th style="padding:6px 12px;border:1px solid #ddd;text-align:right">Value</th>
+          <th style="padding:6px 12px;border:1px solid #ddd;text-align:right">Share</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+  `);
+});
+
 export default app;
