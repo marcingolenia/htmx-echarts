@@ -271,7 +271,8 @@ function labelsForLength(len: number, nowMs = Date.now()): string[] {
 }
 
 let labels = labelsForLength(data.length);
-app.get("/line-polling", (c) => {
+app.get("/line-polling", async (c) =>{
+  await Bun.sleep(600);
   data.shift();
   data.push(Math.random() * 100);
   labels.shift();
@@ -285,6 +286,41 @@ app.get("/line-polling", (c) => {
         name: "Random",
         type: "line",
         data: data,
+      },
+    ],
+  };
+  return c.json(option);
+});
+
+// Chord chart — slow endpoint to demonstrate the built-in loading indicator
+app.get("/chord", async (c) => {
+  await Bun.sleep(5000);
+  const option: EChartsOption = {
+    tooltip: {},
+    legend: {},
+    series: [
+      {
+        type: "chord",
+        clockwise: false,
+        label: { show: true },
+        lineStyle: { color: "target" },
+        data: [
+          { name: "Direct" },
+          { name: "Email" },
+          { name: "Search" },
+          { name: "Video" },
+          { name: "Union Ads" },
+        ],
+        links: [
+          { source: "Direct",    target: "Email",     value: 120 },
+          { source: "Direct",    target: "Search",    value: 80  },
+          { source: "Email",     target: "Search",    value: 60  },
+          { source: "Email",     target: "Video",     value: 40  },
+          { source: "Search",    target: "Video",     value: 90  },
+          { source: "Search",    target: "Union Ads", value: 50  },
+          { source: "Video",     target: "Union Ads", value: 30  },
+          { source: "Union Ads", target: "Direct",    value: 70  },
+        ],
       },
     ],
   };

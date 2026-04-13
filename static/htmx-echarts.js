@@ -66,14 +66,15 @@ const parseDataUrl = (raw) => {
 const remoteFetch = (chart, url) =>
   fetch(url)
     .then((r) => r.json())
-    .then((d) => chart.setOption(d))
-    .catch((e) => console.error("htmx-echarts fetch", e));
+    .then((d) => { chart.setOption(d); chart.hideLoading(); })
+    .catch((e) => { console.error("htmx-echarts fetch", e); chart.hideLoading(); });
 
 const remoteSSE = (chart, url, ev) => {
   const src = new EventSource(url);
   src.addEventListener(ev, (e) => {
     try {
       chart.setOption(JSON.parse(e.data));
+      chart.hideLoading();
     } catch (err) {
       console.error("htmx-echarts SSE", err);
     }
@@ -99,6 +100,7 @@ const remoteSSE = (chart, url, ev) => {
 
     const chart = createChart(el);
     bridge(chart, el);
+    if (el.dataset.chartLoading !== "false") chart.showLoading();
 
     if (sse) el._sseSource = remoteSSE(chart, url, sse);
     else {
