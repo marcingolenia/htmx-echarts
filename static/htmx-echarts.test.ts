@@ -30,6 +30,7 @@ describe("static/htmx-echarts.js", () => {
 
   // Per-test call logs (reset in beforeEach)
   let fetchUrls: string[] = [];
+  let htmxTriggerCalls: { elt: any; name: string; detail?: any }[] = [];
   let consoleErrors: any[][] = [];
   let intervals: { id: number; ms: number; cb: () => void; cleared: boolean }[] =
     [];
@@ -46,6 +47,7 @@ describe("static/htmx-echarts.js", () => {
         extName = name;
         extDef = def;
       },
+      trigger: (_elt: any, _name: string, _detail?: any) => {},
     };
 
     await import("./htmx-echarts.js");
@@ -57,6 +59,7 @@ describe("static/htmx-echarts.js", () => {
 
   beforeEach(() => {
     fetchUrls = [];
+    htmxTriggerCalls = [];
     consoleErrors = [];
     intervals = [];
     nextIntervalId = 0;
@@ -103,10 +106,11 @@ describe("static/htmx-echarts.js", () => {
 
     (globalThis as any).echarts = {
       init: (_el: any) => {
+        const handlers: Record<string, ((p: any) => void)[]> = {};
         let setOptionCalls: any[] = [];
         let disposeCalled = 0;
         let resizeCalled = 0;
-        return {
+        const chart = {
           setOption: (opt: any) => setOptionCalls.push(opt),
           dispose: () => {
             disposeCalled++;
@@ -114,9 +118,20 @@ describe("static/htmx-echarts.js", () => {
           resize: () => {
             resizeCalled++;
           },
+          on: (ev: string, fn: (p: any) => void) => {
+            (handlers[ev] ||= []).push(fn);
+          },
+          __emit: (ev: string, params: any) => {
+            (handlers[ev] || []).forEach((fn) => fn(params));
+          },
           __calls: () => ({ setOptionCalls, disposeCalled, resizeCalled }),
         };
+        return chart;
       },
+    };
+
+    (globalThis as any).htmx.trigger = (elt: any, name: string, detail?: any) => {
+      htmxTriggerCalls.push({ elt, name, detail });
     };
 
     (globalThis as any).setInterval = (cb: () => void, ms: number) => {
@@ -272,6 +287,73 @@ describe("static/htmx-echarts.js", () => {
 
     expect(intervals[0]!.cleared).toBe(true);
     expect(c._pollIntervalId).toBe(null);
+  });
+
+  test("bridges ECharts click and mouseover to htmx.trigger on the chart element", async () => {
+    const c = el({ url: "/initial.json", chartType: "line" });
+    const root = { querySelectorAll: (_sel: string) => [c] };
+
+    ext.onEvent("htmx:load", { detail: { elt: root }, target: root });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const chart = c._chartInstance as {
+      __emit: (ev: string, params: Record<string, unknown>) => void;
+    };
+    chart.__emit("click", { name: "A", value: 42, seriesIndex: 0, dataIndex: 1 });
+    chart.__emit("mouseover", { name: "B", value: 7 });
+
+    expect(htmxTriggerCalls).toHaveLength(2);
+    expect(htmxTriggerCalls[0]!.elt).toBe(c);
+    expect(htmxTriggerCalls[0]!.name).toBe("chart-click");
+    expect(htmxTriggerCalls[0]!.detail).toMatchObject({ name: "A", value: 42 });
+    expect(htmxTriggerCalls[1]!.name).toBe("chart-hover");
+    expect(htmxTriggerCalls[1]!.detail).toMatchObject({ name: "B", value: 7 });
+  });
+
+  test("data-chart-bridge=false disables the HTMX event bridge", async () => {
+    const c = el({
+      url: "/initial.json",
+      chartType: "line",
+      chartBridge: "false",
+    });
+    const root = { querySelectorAll: (_sel: string) => [c] };
+
+    ext.onEvent("htmx:load", { detail: { elt: root }, target: root });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const chart = c._chartInstance as {
+      __emit: (ev: string, params: Record<string, unknown>) => void;
+    };
+    chart.__emit("click", { name: "A", value: 1 });
+
+    expect(htmxTriggerCalls).toHaveLength(0);
+  });
+
+  test("data-chart-event-click and data-chart-event-hover override event names", async () => {
+    const c = el({
+      url: "/initial.json",
+      chartType: "line",
+      chartEventClick: "slice-pick",
+      chartEventHover: "slice-hover",
+    });
+    const root = { querySelectorAll: (_sel: string) => [c] };
+
+    ext.onEvent("htmx:load", { detail: { elt: root }, target: root });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const chart = c._chartInstance as {
+      __emit: (ev: string, params: Record<string, unknown>) => void;
+    };
+    chart.__emit("click", { name: "X" });
+    chart.__emit("mouseover", { name: "Y" });
+
+    expect(htmxTriggerCalls.map((t) => t.name)).toEqual(["slice-pick", "slice-hover"]);
   });
 });
 

@@ -226,10 +226,13 @@ The demo app serves that JSON from `GET /charts/empty-placeholder` so you can tr
 
 **Supported attributes:**
 
-- `data-chart-type` (optional): chart type hint (e.g. `"line"`, `"bar"`, `"scatter"`, `"pie"`). Helpful for semantics but not required, since the option comes from the backend.
+- `data-chart-type` (required): marks the element as a chart container — the extension uses `[data-chart-type]` as its selector. The value (e.g. `"line"`, `"bar"`, `"pie"`) is not read by the extension but is useful for readability; without the attribute the element is ignored entirely.
 - `data-url` (required): URL used either for SSE streaming or static JSON fetch, optionally followed by polling modifiers (see **Polling** below).
 - `data-sse-event` (optional): when set, the helper opens an `EventSource` to `data-url` and listens for this SSE event name; when omitted, the helper performs a `fetch(url)` and treats the response as static data (optionally with polling).
 - `data-theme` (optional): registered ECharts theme name passed to `echarts.init` (see **Theme** below). Omit for the default look.
+- `data-chart-bridge` (optional): which ECharts events to forward to HTMX — `click`, `hover` / `mouseover`, or `false` / `none` (see **Chart events** below).
+- `data-chart-event-click` / `data-chart-event-hover` (optional): custom event names instead of `chart-click` / `chart-hover`.
+- `data-chart-loading` (optional): set to `"false"` to suppress the built-in loading spinner. By default the extension calls `chart.showLoading()` immediately after init and `chart.hideLoading()` once the first data arrives (fetch response or first SSE event).
 
 ### Theme
 
@@ -265,6 +268,50 @@ Bundled theme scripts live under `echarts/theme/` on the CDN (for example `macar
 For a **custom** theme, run `echarts.registerTheme("myTheme", { /* theme object */ })` before `htmx-echarts.js` executes, then set `data-theme="myTheme"` on the chart element.
 
 The official [theme download / gallery page](https://echarts.apache.org/en/download-theme.html) lists more options and includes the **theme builder**; nothing in this extension stops you from registering a theme you export from there (same `registerTheme` + `data-theme` flow as any other custom theme).
+
+### Chart events (HTMX bridge)
+
+ECharts user events are forwarded to the chart container as **DOM events** via [`htmx.trigger`](https://htmx.org/api/#trigger), so you can drive HTMX from the chart without extra glue code (for example `hx-trigger="chart-click"` on the same element to load a detail table after a bar click).
+
+By default the extension listens for:
+
+- **`chart-click`** — ECharts [`click`](https://echarts.apache.org/en/api.html#events.Mouse%20events)
+- **`chart-hover`** — ECharts [`mouseover`](https://echarts.apache.org/en/api.html#events.Mouse%20events) on series / graphic elements
+
+Each event’s `detail` is a plain object with useful fields from ECharts’ callback argument when present, for example `name`, `value`, `seriesIndex`, `dataIndex`, `seriesName`, `componentType`, `data`, and `color`.
+
+**Example: load a fragment when a slice is clicked**
+
+```html
+<div
+  data-chart-type="pie"
+  data-url="/api/charts/sales-by-region"
+  hx-trigger="chart-click"
+  hx-get="/api/details"
+  hx-target="#details"
+></div>
+```
+
+`event.detail` matches ECharts’ callback argument (e.g. `name`, `value`). To send those fields as parameters, use `hx-vals` with a `js:` expression (for example `hx-vals=’js:{ region: event.detail.name }’`) or handle the event with `hx-on:chart-click` and call `htmx.ajax` yourself, depending on your HTMX version and needs.
+
+**Inline logging (devtools)**
+
+```html
+<div
+  data-chart-type="pie"
+  data-url="/api/charts/sales-by-region"
+  hx-on:chart-click="console.log(‘chart-click’, event.detail)"
+  hx-on:chart-hover="console.log(‘chart-hover’, event.detail)"
+></div>
+```
+
+**Optional attributes**
+
+- `data-chart-bridge` — comma-separated list: `click`, `hover` (or `mouseover`). Defaults to `click,hover`. Use `false` or `none` to disable bridging.
+- `data-chart-event-click` — override the click event name (default `chart-click`).
+- `data-chart-event-hover` — override the hover event name (default `chart-hover`).
+
+If `htmx.trigger` is not available, the extension dispatches a bubbling `CustomEvent` with the same name and `detail` instead.
 
 ### Polling
 
@@ -532,6 +579,9 @@ This endpoint:
     - `data-url`: endpoint for either SSE or static JSON fetch (optionally with polling modifiers).
     - `data-sse-event`: when present, enables SSE streaming mode.
     - `data-theme`: optional registered theme name for `echarts.init` (see **Theme**).
+    - `data-chart-bridge` / `data-chart-event-click` / `data-chart-event-hover`: optional wiring for ECharts → HTMX events (see **Chart events**).
+    - `data-chart-loading`: when not `"false"`, calls `chart.showLoading()` immediately and `chart.hideLoading()` once the first data arrives.
+  - Subscribes to ECharts `click` and `mouseover` (unless disabled) and forwards them with `htmx.trigger` on the chart element as `chart-click` and `chart-hover` (or custom names).
   - **Static mode** (no `data-sse-event`):
     - Parses `data-url` into:
       - `url`: the request URL.

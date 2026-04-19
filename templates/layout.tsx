@@ -7,8 +7,8 @@ export const Layout = ({ children }: { children?: unknown }) => {
         <title>Lytc</title>
         <script src="/static/htmx.min.js.js" defer></script>
         {/* Browser ECharts bundle so window.echarts is available */}
-        <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js" defer></script>
-        <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/theme/dark.js" defer></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/6.0.0/echarts.min.js" defer></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/6.0.0/theme/dark.min.js" defer></script>
         <script src="/static/htmx-echarts.js" defer></script>
       </head>
       <body hx-ext="echarts">

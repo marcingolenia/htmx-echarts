@@ -117,6 +117,60 @@ export const Chart = ({ chart }: { chart: string }) => {
         />
       </section>
 
+      {/* ECharts → HTMX: chart-click / chart-hover for dashboards */}
+      <section
+        id="chart-events-section"
+        style={{ width: "100%", maxWidth: 640, marginBottom: 40 }}
+      >
+        <h2>Chart events (HTMX bridge)</h2>
+        <p>
+          Click or hover a pie slice and open the browser console:{" "}
+          <code>chart-click</code> and <code>chart-hover</code> fire on this
+          element with <code>event.detail</code> (series name, value, indices,
+          etc.). Use <code>hx-trigger=&quot;chart-click&quot;</code> on the same
+          chart container to load fragments (e.g. a detail table) without extra
+          JavaScript.
+        </p>
+
+        <div
+          data-chart-type="pie"
+          data-url="/charts/pie"
+          {...{
+            "hx-get": "/charts/pie-detail",
+            "hx-trigger": "chart-hover",
+            "hx-target": "#pie-detail",
+            "hx-vals": 'js:{"name": event.detail.name}',
+            "hx-on:chart-click":
+              "console.log('chart-click', event.detail)",
+            "hx-on:chart-hover":
+              "console.log('chart-hover', event.detail)",
+          }}
+          style={{ width: "100%", height: 400, border: "1px solid #eee" }}
+        />
+        <div
+          id="pie-detail"
+          style={{ marginTop: 16, minHeight: 80 }}
+        />
+      </section>
+
+      {/* Chord chart: slow endpoint (5s) to show the built-in loading indicator */}
+      <section
+        id="chord-chart-section"
+        style={{ width: "100%", maxWidth: 640, marginBottom: 40 }}
+      >
+        <h2>Chord chart (loading indicator)</h2>
+        <p>
+          The extension calls <code>chart.showLoading()</code> immediately after
+          init and <code>chart.hideLoading()</code> once data arrives. This
+          endpoint deliberately waits 5 seconds so you can see the spinner.
+        </p>
+        <div
+          data-chart-type="chord"
+          data-url="/charts/chord"
+          style={{ width: "100%", height: 400, border: "1px solid #eee" }}
+        />
+      </section>
+
       {/* Empty state: backend returns option with graphic text (no series data) */}
       <section
         id="empty-chart-section"

@@ -12,7 +12,8 @@
     "build": "bun build ./static/htmx-echarts.js --outfile=./dist/htmx-echarts.min.js --minify --target=browser"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "bun-types": "^1.3.12"
   },
   "peerDependencies": {
     "typescript": "^5"
