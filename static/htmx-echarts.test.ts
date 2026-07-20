@@ -26,7 +26,12 @@ describe("static/htmx-echarts.js", () => {
     consoleError: console.error,
   };
 
-  let ext: { onEvent: (name: string, evt: any) => void };
+  type Hook = (elt: any, detail?: any) => void;
+  let ext: {
+    htmx_after_process: Hook;
+    htmx_before_swap: Hook;
+    htmx_before_cleanup: Hook;
+  };
 
   // Per-test call logs (reset in beforeEach)
   let fetchUrls: string[] = [];
@@ -35,6 +40,10 @@ describe("static/htmx-echarts.js", () => {
   let intervals: { id: number; ms: number; cb: () => void; cleared: boolean }[] =
     [];
   let nextIntervalId = 0;
+  let fetchResponse: () => any;
+
+  // Drains the promise chain in remoteFetch without counting microtask hops.
+  const flush = () => new Promise((r) => setTimeout(r, 0));
 
   beforeAll(async () => {
     (globalThis as any).window = globalThis as any;
@@ -43,7 +52,7 @@ describe("static/htmx-echarts.js", () => {
     let extName: any = null;
     let extDef: any = null;
     (globalThis as any).htmx = {
-      defineExtension: (name: string, def: any) => {
+      registerExtension: (name: string, def: any) => {
         extName = name;
         extDef = def;
       },
@@ -53,7 +62,9 @@ describe("static/htmx-echarts.js", () => {
     await import("./htmx-echarts.js");
 
     expect(extName).toBe("echarts");
-    expect(typeof extDef?.onEvent).toBe("function");
+    expect(typeof extDef?.htmx_after_process).toBe("function");
+    expect(typeof extDef?.htmx_before_swap).toBe("function");
+    expect(typeof extDef?.htmx_before_cleanup).toBe("function");
     ext = extDef;
   });
 
@@ -68,11 +79,17 @@ describe("static/htmx-echarts.js", () => {
       consoleErrors.push(args);
     };
 
+    // Overridable per test so failure paths can be exercised.
+    fetchResponse = () => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => ({ series: [{ type: "line", data: [1, 2, 3] }] }),
+    });
+
     (globalThis as any).fetch = async (url: string) => {
       fetchUrls.push(url);
-      return {
-        json: async () => ({ series: [{ type: "line", data: [1, 2, 3] }] }),
-      };
+      return fetchResponse();
     };
 
     class EventSourceStub {
@@ -110,11 +127,20 @@ describe("static/htmx-echarts.js", () => {
         let setOptionCalls: any[] = [];
         let disposeCalled = 0;
         let resizeCalled = 0;
+        let showLoadingCalled = 0;
+        let hideLoadingCalled = 0;
         const chart = {
           setOption: (opt: any) => setOptionCalls.push(opt),
+          showLoading: () => {
+            showLoadingCalled++;
+          },
+          hideLoading: () => {
+            hideLoadingCalled++;
+          },
           dispose: () => {
             disposeCalled++;
           },
+          isDisposed: () => disposeCalled > 0,
           resize: () => {
             resizeCalled++;
           },
@@ -124,7 +150,13 @@ describe("static/htmx-echarts.js", () => {
           __emit: (ev: string, params: any) => {
             (handlers[ev] || []).forEach((fn) => fn(params));
           },
-          __calls: () => ({ setOptionCalls, disposeCalled, resizeCalled }),
+          __calls: () => ({
+            setOptionCalls,
+            disposeCalled,
+            resizeCalled,
+            showLoadingCalled,
+            hideLoadingCalled,
+          }),
         };
         return chart;
       },
@@ -157,11 +189,11 @@ describe("static/htmx-echarts.js", () => {
     console.error = original.consoleError;
   });
 
-  test("htmx:load initializes charts; fetch path when no data-sse-event", async () => {
+  test("htmx:after:process initializes charts; fetch path when no data-sse-event", async () => {
     const c = el({ url: "/initial.json", chartType: "line" });
     const root = { querySelectorAll: (_sel: string) => [c] };
 
-    ext.onEvent("htmx:load", { detail: { elt: root }, target: root });
+    ext.htmx_after_process(root, {});
 
     await Promise.resolve();
     await Promise.resolve();
@@ -177,7 +209,7 @@ describe("static/htmx-echarts.js", () => {
     const c = el({ url: "/poll.json poll:1000ms", chartType: "line" });
     const root = { querySelectorAll: (_sel: string) => [c] };
 
-    ext.onEvent("htmx:load", { detail: { elt: root }, target: root });
+    ext.htmx_after_process(root, {});
 
     await Promise.resolve();
     await Promise.resolve();
@@ -202,17 +234,17 @@ describe("static/htmx-echarts.js", () => {
     });
     const root = { querySelectorAll: (_sel: string) => [c] };
 
-    ext.onEvent("htmx:load", { detail: { elt: root }, target: root });
+    ext.htmx_after_process(root, {});
 
     expect(c._sseSource).toBeTruthy();
     expect(intervals).toHaveLength(0);
   });
 
-  test("htmx:load initializes charts; SSE path when data-sse-event present", () => {
+  test("htmx:after:process initializes charts; SSE path when data-sse-event present", () => {
     const c = el({ url: "/sse", sseEvent: "point", chartType: "line" });
     const root = { querySelectorAll: (_sel: string) => [c] };
 
-    ext.onEvent("htmx:load", { detail: { elt: root }, target: root });
+    ext.htmx_after_process(root, {});
 
     expect(c._sseSource).toBeTruthy();
     c._sseSource.emit("point", JSON.stringify({ xAxis: { type: "value" } }));
@@ -225,7 +257,7 @@ describe("static/htmx-echarts.js", () => {
     const c = el({ url: "/sse", sseEvent: "point", chartType: "line" });
     const root = { querySelectorAll: (_sel: string) => [c] };
 
-    ext.onEvent("htmx:load", { detail: { elt: root }, target: root });
+    ext.htmx_after_process(root, {});
 
     expect(() => c._sseSource.emit("point", "{not json")).not.toThrow();
 
@@ -245,24 +277,159 @@ describe("static/htmx-echarts.js", () => {
       },
     };
 
-    ext.onEvent("htmx:load", { detail: { elt: root }, target: root });
+    ext.htmx_after_process(root, {});
 
     expect(a._chartInstance).toBeTruthy();
     expect(b._chartInstance).toBeTruthy();
     expect(b._sseSource).toBeTruthy();
   });
 
-  test("htmx:beforeCleanupElement cleans up charts", () => {
+  test("initializes the processed root itself when it is a chart", () => {
+    // htmx 4 calls process() on each swapped-in node, so the root can be the chart.
+    const c = {
+      ...el({ url: "/root.json", chartType: "line" }),
+      matches: (sel: string) => sel === "[data-chart-type]",
+    };
+
+    ext.htmx_after_process(c, {});
+
+    expect(c._chartInstance).toBeTruthy();
+  });
+
+  test("does not re-initialize a chart that is processed twice", () => {
+    const c = el({ url: "/initial.json", chartType: "line" });
+    const root = { querySelectorAll: (_sel: string) => [c] };
+
+    ext.htmx_after_process(root, {});
+    const chart = c._chartInstance;
+    ext.htmx_after_process(root, {});
+
+    expect(c._chartInstance).toBe(chart);
+  });
+
+  test("htmx:before:swap cleans up charts inside each swap target", () => {
+    const c = el({ url: "/sse", sseEvent: "tick", chartType: "line" });
+    const target = { querySelectorAll: (_sel: string) => [c] };
+
+    ext.htmx_after_process(target, {});
+
+    const src = c._sseSource;
+    const chart = c._chartInstance;
+
+    ext.htmx_before_swap(null, { tasks: [{ target }] });
+
+    expect(c._chartInstance).toBe(null);
+    expect(src.closeCalled).toBe(1);
+    expect(chart.__calls().disposeCalled).toBe(1);
+  });
+
+  test("htmx:before:swap leaves charts alone for morph and none swaps", () => {
+    const c = el({ url: "/sse", sseEvent: "tick", chartType: "line" });
+    const target = { querySelectorAll: (_sel: string) => [c] };
+
+    ext.htmx_after_process(target, {});
+    const chart = c._chartInstance;
+
+    // Morph preserves matching elements, so the chart div is still there afterwards.
+    ext.htmx_before_swap(null, {
+      tasks: [
+        { target, swapSpec: { style: "innerMorph" } },
+        { target, swapSpec: { style: "outerMorph" } },
+        { target, swapSpec: "none" },
+      ],
+    });
+
+    expect(c._chartInstance).toBe(chart);
+    expect(chart.__calls().disposeCalled).toBe(0);
+  });
+
+  test("a fetch that lands after disposal does not touch the chart", async () => {
+    const c = el({ url: "/slow.json", chartType: "line" });
+    const root = { querySelectorAll: (_sel: string) => [c] };
+
+    let release: (v: any) => void = () => {};
+    fetchResponse = () => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: () => new Promise((r) => (release = r)),
+    });
+
+    ext.htmx_after_process(root, {});
+    const chart = c._chartInstance;
+
+    // Swap disposes the chart while the request is still outstanding.
+    ext.htmx_before_cleanup(root, {});
+    release({ series: [] });
+    await flush();
+
+    expect(chart.__calls().setOptionCalls).toHaveLength(0);
+    expect(consoleErrors).toHaveLength(0);
+  });
+
+  test("a non-OK response is reported and never reaches setOption", async () => {
+    const c = el({ url: "/missing.json", chartType: "line" });
+    const root = { querySelectorAll: (_sel: string) => [c] };
+
+    fetchResponse = () => ({
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+      json: async () => ({ error: "nope" }),
+    });
+
+    ext.htmx_after_process(root, {});
+    await flush();
+
+    expect(c._chartInstance.__calls().setOptionCalls).toHaveLength(0);
+    expect(consoleErrors.length).toBeGreaterThan(0);
+    expect(String(consoleErrors[0])).toContain("404");
+  });
+
+  test("polling skips a tick while the previous request is still in flight", async () => {
+    const c = el({ url: "/slow.json poll:1000ms", chartType: "line" });
+    const root = { querySelectorAll: (_sel: string) => [c] };
+
+    let release: (v: any) => void = () => {};
+    fetchResponse = () => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: () => new Promise((r) => (release = r)),
+    });
+
+    ext.htmx_after_process(root, {});
+    await flush();
+    expect(fetchUrls).toHaveLength(1);
+
+    // Three ticks while the first poll is unresolved must issue one request, not three.
+    intervals[0]!.cb();
+    await flush();
+    intervals[0]!.cb();
+    intervals[0]!.cb();
+    await flush();
+
+    expect(fetchUrls).toHaveLength(2);
+
+    release({ series: [] });
+    await flush();
+
+    intervals[0]!.cb();
+    await flush();
+    expect(fetchUrls).toHaveLength(3);
+  });
+
+  test("htmx:before:cleanup cleans up charts", () => {
     const c = el({ url: "/sse", sseEvent: "tick", chartType: "line" });
     const root = { querySelectorAll: (_sel: string) => [c] };
 
-    ext.onEvent("htmx:load", { detail: { elt: root }, target: root });
+    ext.htmx_after_process(root, {});
 
     const src = c._sseSource;
     const chart = c._chartInstance;
     const ro = c._resizeObserver;
 
-    ext.onEvent("htmx:beforeCleanupElement", { target: root });
+    ext.htmx_before_cleanup(root, {});
 
     expect(c._sseSource).toBe(null);
     expect(c._pollIntervalId).toBe(null);
@@ -278,12 +445,12 @@ describe("static/htmx-echarts.js", () => {
     const c = el({ url: "/poll.json poll:1s", chartType: "line" });
     const root = { querySelectorAll: (_sel: string) => [c] };
 
-    ext.onEvent("htmx:load", { detail: { elt: root }, target: root });
+    ext.htmx_after_process(root, {});
 
     expect(intervals).toHaveLength(1);
     expect(c._pollIntervalId).toBe(intervals[0]!.id);
 
-    ext.onEvent("htmx:beforeCleanupElement", { target: root });
+    ext.htmx_before_cleanup(root, {});
 
     expect(intervals[0]!.cleared).toBe(true);
     expect(c._pollIntervalId).toBe(null);
@@ -293,7 +460,7 @@ describe("static/htmx-echarts.js", () => {
     const c = el({ url: "/initial.json", chartType: "line" });
     const root = { querySelectorAll: (_sel: string) => [c] };
 
-    ext.onEvent("htmx:load", { detail: { elt: root }, target: root });
+    ext.htmx_after_process(root, {});
 
     await Promise.resolve();
     await Promise.resolve();
@@ -320,7 +487,7 @@ describe("static/htmx-echarts.js", () => {
     });
     const root = { querySelectorAll: (_sel: string) => [c] };
 
-    ext.onEvent("htmx:load", { detail: { elt: root }, target: root });
+    ext.htmx_after_process(root, {});
 
     await Promise.resolve();
     await Promise.resolve();
@@ -342,7 +509,7 @@ describe("static/htmx-echarts.js", () => {
     });
     const root = { querySelectorAll: (_sel: string) => [c] };
 
-    ext.onEvent("htmx:load", { detail: { elt: root }, target: root });
+    ext.htmx_after_process(root, {});
 
     await Promise.resolve();
     await Promise.resolve();

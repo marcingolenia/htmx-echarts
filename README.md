@@ -1,5 +1,7 @@
 # HTMX Echarts
 
+**THIS VERSION IS WORKING WITH HTMX 4, BETA 5. FOR HTMX 2, USE HTMX-ECHARTS 0.2.0.**
+
 An `htmx` extension (`echarts`) that connects `htmx`, `ECharts`, and Server-Sent Events (SSE) for live-updating (or statically-fetched) charts.
 
 ![demo](./charts_demo.gif)
@@ -67,7 +69,7 @@ Example layout head (local bundle):
   /* Extension file */
   <script src="/static/htmx-echarts.js" defer></script>
   /* or cnd */
-  <script src="https://cdn.jsdelivr.net/npm/htmx-echarts@0.1.0/dist/htmx-echarts.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/htmx-echarts@4.0.0-beta5/dist/htmx-echarts.min.js" defer></script>
 </head>
 ```
 
@@ -76,12 +78,14 @@ Example layout head (local bundle):
 
 ### 2. Enable the extension
 
-Activate the extension on any region that contains charts (commonly `body`):
+Nothing to do — htmx 4 registers extensions on script load, so the `hx-ext="echarts"`
+attribute htmx 2 required is gone. Including the script is enough.
+
+If you restrict extensions with the `htmx-config` meta tag, list `echarts` explicitly
+or it will refuse to register:
 
 ```html
-<body hx-ext="echarts">
-  ...
-</body>
+<meta name="htmx-config" content='{"extensions": "echarts"}' />
 ```
 
 ---
@@ -568,10 +572,12 @@ This endpoint:
 
 ## How it works
 
-- The extension registers as `echarts` via `htmx.defineExtension("echarts", ...)`.
-- On **`htmx:load`** within an `hx-ext="echarts"` region, it scans the loaded fragment for `[data-chart-type]` and initializes charts.
-- On **`htmx:historyRestore`** it first cleans up charts in the restored fragment and then re-initializes them.
-- On **HTMX cleanup** (`htmx:beforeCleanupElement`), for any subtree being removed inside an `hx-ext="echarts"` region, it cleans up charts.
+- The extension registers as `echarts` via `htmx.registerExtension("echarts", ...)`, so it is active document-wide as soon as the script loads.
+- On **`htmx:after:process`** it scans the processed node — and its descendants — for `[data-chart-type]` and initializes any chart it has not seen yet. htmx 4 processes each swapped-in node individually, so the processed node itself can be a chart.
+- On **`htmx:before:swap`** it disposes charts inside every swap target, since the elements are about to be replaced. Morph swaps (`innerMorph`/`outerMorph`) and `none` are skipped: morph keeps matching elements in place, so the charts survive the swap and disposing them would rebuild every chart on each request.
+- On **`htmx:before:cleanup`** it disposes charts in the element being cleaned up. htmx 4 fires this only for htmx-powered elements, so a plain chart `<div>` usually will not — which is why the swap hook above exists. In htmx 2 this event alone was enough.
+- Charts removed from the DOM by something other than htmx are not disposed; call `chart.dispose()` yourself if you remove them by hand.
+- History restore needs no special handling: htmx 4 re-fetches and swaps the page, which runs the cleanup and init paths above.
 - For each chart element:
   - Creates an ECharts instance on that element.
   - Attaches a `ResizeObserver` so the chart resizes with its container.

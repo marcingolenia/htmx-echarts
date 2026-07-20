@@ -63,22 +63,39 @@ const parseDataUrl = (raw) => {
   return { url: parts[0] || "", pollMs };
 };
 
+// A swap can dispose the chart while its request is still in flight; ECharts errors
+// on any call made after that, so every async callback re-checks before touching it.
+const alive = (chart) => chart && !chart.isDisposed?.();
+
+const apply = (chart, option) => {
+  if (!alive(chart)) return;
+  chart.setOption(option);
+  chart.hideLoading();
+};
+
 const remoteFetch = (chart, url) =>
   fetch(url)
-    .then((r) => r.json())
-    .then((d) => { chart.setOption(d); chart.hideLoading(); })
-    .catch((e) => { console.error("htmx-echarts fetch", e); chart.hideLoading(); });
+    .then((r) => {
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`.trim());
+      return r.json();
+    })
+    .then((d) => apply(chart, d))
+    .catch((e) => {
+      console.error("htmx-echarts fetch", url, e);
+      if (alive(chart)) chart.hideLoading();
+    });
 
 const remoteSSE = (chart, url, ev) => {
   const src = new EventSource(url);
   src.addEventListener(ev, (e) => {
     try {
-      chart.setOption(JSON.parse(e.data));
-      chart.hideLoading();
+      apply(chart, JSON.parse(e.data));
     } catch (err) {
       console.error("htmx-echarts SSE", err);
     }
   });
+  // EventSource reconnects on its own, so this is diagnostic only.
+  src.addEventListener("error", () => console.error("htmx-echarts SSE", url));
   return src;
 };
 
@@ -89,7 +106,7 @@ const remoteSSE = (chart, url, ev) => {
   }
 
   const init = (el) => {
-    if (!el) return;
+    if (!el || el._chartInstance) return;
     if (!window.echarts) {
       console.error("htmx-echarts: echarts missing");
       return;
@@ -105,34 +122,54 @@ const remoteSSE = (chart, url, ev) => {
     if (sse) el._sseSource = remoteSSE(chart, url, sse);
     else {
       remoteFetch(chart, url);
-      if (pollMs) el._pollIntervalId = setInterval(() => remoteFetch(chart, url), pollMs);
+      if (pollMs) {
+        // An endpoint slower than the poll interval would otherwise stack requests.
+        let inFlight = false;
+        el._pollIntervalId = setInterval(() => {
+          if (inFlight) return;
+          inFlight = true;
+          remoteFetch(chart, url).then(() => { inFlight = false; });
+        }, pollMs);
+      }
     }
   };
 
-  const scan = (root) => {
-    if (!root?.querySelectorAll) return;
-    root.querySelectorAll("[data-chart-type]").forEach(init);
+  const destroy = (el) => {
+    el._sseSource?.close();
+    if (el._pollIntervalId) clearInterval(el._pollIntervalId);
+    el._chartInstance?.dispose();
+    el._resizeObserver?.disconnect();
+    el._sseSource = el._pollIntervalId = el._chartInstance = el._resizeObserver = null;
   };
 
-  const cleanup = (root) => {
-    if (!root?.querySelectorAll) return;
-    root.querySelectorAll("[data-chart-type]").forEach((el) => {
-      el._sseSource?.close();
-      if (el._pollIntervalId) clearInterval(el._pollIntervalId);
-      el._chartInstance?.dispose();
-      el._resizeObserver?.disconnect();
-      el._sseSource = el._pollIntervalId = el._chartInstance = el._resizeObserver = null;
-    });
+  // htmx 4 processes each swapped-in node, so the root itself may be a chart.
+  const charts = (root) => {
+    const found = [...(root?.querySelectorAll?.("[data-chart-type]") ?? [])];
+    if (root?.matches?.("[data-chart-type]")) found.unshift(root);
+    return found;
   };
 
-  htmx.defineExtension("echarts", {
-    onEvent: (name, evt) => {
-      const root = evt.detail?.elt || evt.target;
-      if (name === "htmx:load") scan(root);
-      else if (name === "htmx:historyRestore") {
-        cleanup(root);
-        scan(root);
-      } else if (name === "htmx:beforeCleanupElement") cleanup(evt.target);
+  const scan = (root) => charts(root).forEach(init);
+  const cleanup = (root) => charts(root).forEach(destroy);
+
+  htmx.registerExtension("echarts", {
+    htmx_after_process: (elt) => {
+      scan(elt);
+    },
+    // htmx 4 fires htmx:before:cleanup only for [data-htmx-powered] elements, so a
+    // plain chart div never sees it. The swap targets are where those charts go.
+    htmx_before_swap: (_elt, detail) => {
+      for (const task of detail?.tasks ?? []) {
+        const spec = task?.swapSpec;
+        const style = (typeof spec === "string" ? spec : spec?.style) || "";
+        // Morph keeps matching elements in place and "none" swaps nothing, so the
+        // charts survive; disposing them here would rebuild every one on each swap.
+        if (style.includes("Morph") || style === "none") continue;
+        cleanup(task.target);
+      }
+    },
+    htmx_before_cleanup: (elt) => {
+      cleanup(elt);
     },
   });
 })();
